@@ -13,4 +13,6 @@ object Dependencies {
 
   lazy val scalatest = "org.scalatest" %% "scalatest" % "2.1.3" % "test"
   lazy val scalacheck = "org.scalacheck" %% "scalacheck" % "1.11.3" % "test"
+
+  lazy val xz = "org.tukaani" % "xz" % "1.5"
 }

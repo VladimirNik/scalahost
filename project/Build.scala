@@ -43,7 +43,7 @@ object ScalaHostBuild extends Build {
     id   = "scalahost",
     base = file("plugin"),
     settings = publishableSettings ++ commonDependencies ++ mergeDependencies ++ Seq(
-      libraryDependencies += interpreter
+      libraryDependencies ++= Seq(interpreter, xz)
     )
   ) dependsOn (foundation % "optional", interface % "optional") // not really optional, used for fatjar
 
