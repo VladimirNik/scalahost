@@ -12,6 +12,7 @@ trait ConvertPhase {
   self: ScalahostPlugin =>
 
   object ConvertComponent extends NscPluginComponent {
+    convSelf =>
     val global: self.global.type = self.global
     import global._
 
@@ -32,6 +33,11 @@ trait ConvertPhase {
       override def apply(unit: CompilationUnit) {
         val punit = c.toScalameta(unit.body, classOf[Source])
         unit.body.appendMetadata("scalameta" -> punit)
+
+        val serializer = new {
+          val global: convSelf.global.type = convSelf.global
+        } with Serialize
+        serializer.serialize(unit.body)
       }
     }
   }
