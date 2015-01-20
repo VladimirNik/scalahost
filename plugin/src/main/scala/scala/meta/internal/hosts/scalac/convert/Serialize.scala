@@ -208,9 +208,10 @@ trait Serialize {
   }
 
   def prepareForUnit(tree: Tree): Unit = {
-    if (annotationLevel == 0) {
+    if (annotationLevel == 0) {  //TODO fix - some conditions should be done without dependency on annotationLevel
       serializer.init(tree)
       serTraverser.traverse(tree)
+      addTreeIdToLocalRefs
     }
   }
 
@@ -220,6 +221,8 @@ trait Serialize {
 
   class SerializeTraverser extends Traverser {
     override def traverse(tree: Tree): Unit = {
+      //if TreeDef
+      linkDefWithOffset(tree)
       tree match {
         case EmptyTree =>
           writeNodeHeader(EmptyTree)
@@ -326,7 +329,7 @@ trait Serialize {
   trait LowLevelSerializer {
     def init(unit: Tree): Unit
 
-    def writeSymbolRef(sym: Symbol): Unit
+    def writeSymbolRef(sym: Symbol, writeToTrees: Boolean = true): Unit
 
     def writeNodeHeader(nd: Any /* Tree | Type */): Unit
 
@@ -345,6 +348,10 @@ trait Serialize {
     def currentOffset: Int
 
     def flush(tree: Tree): Unit
+
+    def linkDefWithOffset(tree: Tree): Unit
+
+    def addTreeIdToLocalRefs: Unit
   }
 
   class BinarySerializer extends LowLevelSerializer {
@@ -434,6 +441,14 @@ trait Serialize {
     val stringsSectionName = "strings"
     val stringsSectionNameBytes = stringsSectionName.getBytes("UTF-8")
 
+    val treeOffsetsForDefs = mutable.HashMap[Symbol, Int]()
+    def linkDefWithOffset(tree: Tree): Unit = {
+      tree match {
+        case _: DefTree => treeOffsetsForDefs.put(tree.symbol, serializer.currentOffset)
+        case _ =>
+      }
+    }
+
     def flush(tree: Tree): Unit = {
       val output = new PickleBuffer(new Array[Byte](2048), 0, 0)
       output.writeRawInt(MAGIC)
@@ -497,13 +512,87 @@ trait Serialize {
     val serializedSymbols = new PickleBuffer(new Array[Byte](1024), 0, 0)
     val symbolOffsets = new mutable.HashMap[Symbol, Int]()
 
-    def writeSymbolRef(sym: Symbol): Unit = {
-      trees.writeNat(333333)
+    def writeSymbolRef(sym: Symbol, writeToTrees: Boolean = true): Unit = {
+      val id = getOrUpdateSymbol(sym)
+      if (writeToTrees) trees.writeNat(id)
+      else serializedSymbols.writeNat(id)
     }
 
-    def serializeSymbol(sym: Symbol): Unit = {
+    def getOrUpdateSymbol(sym: Symbol): Int = symbolOffsets.getOrElseUpdate(sym, addSymbol(sym))
+
+    def addSymbol(sym: Symbol): Int = {
+      val cur = serializedSymbols.writeIndex
+      writeRefHeader(sym)
+      sym match {
+        case NoSymbol =>
+        case _ if sym.isRoot | sym.isRootSymbol =>
+        case _ if sym.hasPackageFlag =>
+          writeSymbolRef(sym.owner, writeToTrees = false)
+          writeStringIdFromRefSection(sym.fullName)
+        //Local
+        case _ if !sym.isLocatable =>
+          writeSymbolRef(sym.owner, writeToTrees = false)
+          //localDefinition (TODO)
+        //External Type
+        case _ if sym.isType =>
+          writeSymbolRef(sym.owner, writeToTrees = false)
+          writeStringIdFromRefSection(sym.fullName)
+        //External Term
+        case _ if sym.isTerm =>
+          writeSymbolRef(sym.owner, writeToTrees = false)
+          writeStringIdFromRefSection(sym.fullName)
+          //erasedParamssCount
+          serializedSymbols.writeNat(sym.paramss.size)
+          //erasedParamsCount
+          for (params <- sym.paramss) {
+            serializedSymbols.writeNat(params.size)
+            for (param <- params) {
+              //erasedParams - TODO-get erased params
+              writeSymbolRef(param.tpe.typeSymbolDirect, writeToTrees = false)
+            }
+          }
+          //erasedRet
+          //TODO-fix for non-methods
+          writeSymbolRef(sym.tpe.resultType.typeSymbolDirect, writeToTrees = false)
+        //case array => //TODO implement for Array
+      }
+      cur
     }
 
+    def writeRefHeader(nd: Symbol): Unit = {
+      val id = (nd: @unchecked) match {
+        case NoSymbol => 0
+        case _ if nd.isRoot => 1 //TODO-check isRoot for NoSymbol and RootClass equality (should be false, true)
+        //Local
+        case sym: Symbol if !sym.isLocatable => 2
+        //External Type
+        case sym: Symbol if sym.isType => 3
+        //External Term
+        case sym: Symbol if sym.isTerm => 4
+        case sym: Symbol if sym.hasPackageFlag => 5
+        //case array => 6 //TODO implement for Array
+      }
+      serializedSymbols.writeByte(id)
+    }
+
+    def writeStringIdFromRefSection(str: String): Unit = {
+      val id = stringOffsets.getOrElseUpdate(str, addString(str))
+      serializedSymbols.writeNat(id)
+    }
+
+    def addTreeIdToLocalRefs: Unit = {
+      symbolOffsets.filter(_._1.isLocatable) foreach {
+        x =>
+          val sym = x._1
+          val symOffset = x._2
+          val treeIdValue = treeOffsetsForDefs.getOrElse(sym, -1)
+          //treeIdPosition - position of treeId field in Local ref - (treeId field is after type field)
+          val treeIdPosition = symOffset + 1
+          serializedSymbols.patchNat(treeIdPosition, treeIdValue)
+      }
+    }
+
+    //TODO implement modifiers rewriting
     def writeModifiersId(mod: Modifiers, idx: Int): Unit = ()
 
     val serializedStrings = new PickleBuffer(new Array[Byte](1024), 0, 0)
@@ -575,7 +664,7 @@ trait Serialize {
       trees.writeNat(id)
     }
 
-    def currentOffset: Int = 0
+    def currentOffset: Int = trees.writeIndex
 
     def writeNodeHeader(nd: Any /* Tree | Type */): Unit = {
       val id = (nd: @unchecked) match {
