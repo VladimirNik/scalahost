@@ -1,10 +1,9 @@
 package scala.meta.internal.hosts.scalac.convert
 
 import java.io.{File, FileOutputStream, BufferedOutputStream, BufferedWriter}
-
 import scala.tools.nsc.Global
 
-trait Serialize {
+trait Serialize extends SerializerUtils {
 
   val global: Global
 
@@ -295,36 +294,37 @@ trait Serialize {
     }
   }
 
-  implicit class NewPickleBuffer(pb: PickleBuffer) {
-    def writeRawLong(b: Long): Unit = {
-      pb.writeByte(((b >>> 56) & 0xFF).toInt)
-      pb.writeByte(((b >>> 48) & 0xFF).toInt)
-      pb.writeByte(((b >>> 40) & 0xFF).toInt)
-      pb.writeByte(((b >>> 32) & 0xFF).toInt)
-      pb.writeByte(((b >>> 24) & 0xFF).toInt)
-      pb.writeByte(((b >>> 16) & 0xFF).toInt)
-      pb.writeByte(((b >>> 8) & 0xFF).toInt)
-      pb.writeByte(((b >>> 0) & 0xFF).toInt)
-    }
-
-    def writeRawInt(b: Int): Unit = {
-      pb.writeByte(((b >>> 24) & 0xFF).toInt)
-      pb.writeByte(((b >>> 16) & 0xFF).toInt)
-      pb.writeByte(((b >>> 8) & 0xFF).toInt)
-      pb.writeByte(((b >>> 0) & 0xFF).toInt)
-    }
-
-    /** append bytes bts[start..start + len - 1] */
-    def writeBytes(bts: Array[Byte], start: Int, len: Int): Unit = {
-      if(len > 0) {
-        pb.ensureCapacity(len)
-        Array.copy(bts, start, pb.bytes, pb.writeIndex, len)
-        pb.writeIndex += len
-      }
-    }
-
-    def writeBytes(bts: Array[Byte]): Unit = writeBytes(bts, 0, bts.length)
-  }
+//  implicit class NewPickleBuffer(pb: PickleBuffer) {
+//    def writeRawLong(b: Long): Unit = {
+//      pb.writeByte(((b >>> 56) & 0xFF).toInt)
+//      pb.writeByte(((b >>> 48) & 0xFF).toInt)
+//      pb.writeByte(((b >>> 40) & 0xFF).toInt)
+//      pb.writeByte(((b >>> 32) & 0xFF).toInt)
+//      pb.writeByte(((b >>> 24) & 0xFF).toInt)
+//      pb.writeByte(((b >>> 16) & 0xFF).toInt)
+//      pb.writeByte(((b >>> 8) & 0xFF).toInt)
+//      pb.writeByte(((b >>> 0) & 0xFF).toInt)
+//    }
+//
+//    def writeRawInt(b: Int): Unit = {
+//      pb.writeByte(((b >>> 24) & 0xFF).toInt)
+//      pb.writeByte(((b >>> 16) & 0xFF).toInt)
+//      pb.writeByte(((b >>> 8) & 0xFF).toInt)
+//      pb.writeByte(((b >>> 0) & 0xFF).toInt)
+//    }
+//
+//    /** append bytes bts[start..start + len - 1] */
+//    def writeBytes(bts: Array[Byte], start: Int, len: Int): Unit = {
+//      if(len > 0) {
+//        pb.ensureCapacity(len)
+//        //def copy(src: AnyRef, srcPos: Int, dest: AnyRef, destPos: Int, length: Int)
+//        Array.copy(bts, start, pb.bytes, pb.writeIndex, len)
+//        pb.writeIndex += len
+//      }
+//    }
+//
+//    def writeBytes(bts: Array[Byte]): Unit = writeBytes(bts, 0, bts.length)
+//  }
 
   trait LowLevelSerializer {
     def init(unit: Tree): Unit
@@ -352,9 +352,16 @@ trait Serialize {
     def linkDefWithOffset(tree: Tree): Unit
 
     def addTreeIdToLocalRefs: Unit
+
+    //TODO - remove - only for test purposes
+    def getTestFile: File
   }
 
   class BinarySerializer extends LowLevelSerializer {
+
+    //TODO - remove - only for test purposes
+    var testFile: File = _
+    def getTestFile = testFile
 
     val verifyClosing: Boolean = true
 
@@ -469,24 +476,30 @@ trait Serialize {
       writeByteArray(stringsSectionNameBytes)
       writePB(serializedStrings)
 
-      def flushTrees: Unit = {
-        var nextSizeIdx = 0
-
-        var copiedUntil = 0
-        while (nextSizeIdx < sizes.length) {
-          writeAE(trees.bytes, copiedUntil, starts(nextSizeIdx))
-          copiedUntil = starts(nextSizeIdx)
-          output.writeNat(sizes(nextSizeIdx))
-          nextSizeIdx = nextSizeIdx + 1
-        }
-        writeAE(trees.bytes, copiedUntil, trees.writeIndex)
-      }
+      //TODO - it should be done when we include size field
+//      def flushTrees: Unit = {
+//        var nextSizeIdx = 0
+//
+//        var copiedUntil = 0
+//        while (nextSizeIdx < sizes.length) {
+//          writeAE(trees.bytes, copiedUntil, starts(nextSizeIdx))
+//          copiedUntil = starts(nextSizeIdx)
+//          output.writeNat(sizes(nextSizeIdx))
+//          nextSizeIdx = nextSizeIdx + 1
+//        }
+//        writeAE(trees.bytes, copiedUntil, trees.writeIndex)
+//      }
 
       writeByteArray(treesSectionNameBytes)
-      flushTrees
+      writePB(trees)
+      //TODO uncomment it after addition of sized in trees section
+//      flushTrees
 
       val f = java.io.File.createTempFile("serializedTree", ".tasty")
       f.createNewFile()
+
+      //TODO - remove (only for test purposes)
+      testFile = f
 
       val d = new BufferedOutputStream(new FileOutputStream(f))
       println(s"flushing ${output.writeIndex} bytes of tree: $tree to ${f.getCanonicalPath}")
@@ -564,6 +577,7 @@ trait Serialize {
         case NoSymbol => 0
         case _ if nd.isRoot => 1 //TODO-check isRoot for NoSymbol and RootClass equality (should be false, true)
         //Local
+        //TODO - rewrite !sym.isLocatable
         case sym: Symbol if !sym.isLocatable => 2
         //External Type
         case sym: Symbol if sym.isType => 3

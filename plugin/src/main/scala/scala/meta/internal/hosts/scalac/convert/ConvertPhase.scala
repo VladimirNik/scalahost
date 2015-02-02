@@ -38,6 +38,14 @@ trait ConvertPhase {
           val global: convSelf.global.type = convSelf.global
         } with Serialize
         serializer.serialize(unit.body)
+
+        val file = serializer.serializer.getTestFile
+
+        val deserializer = new {
+          val global: convSelf.global.type = convSelf.global
+        } with Deserialize
+
+        deserializer.deserialize(file)
       }
     }
   }
