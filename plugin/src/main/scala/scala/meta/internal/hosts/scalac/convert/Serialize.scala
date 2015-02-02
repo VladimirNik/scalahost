@@ -61,6 +61,8 @@ trait Serialize extends SerializerUtils {
         writeNodeHeader(tp)
         writeType(prefix)
         serializer.writeSymbolRef(t.typeSymbol)
+      //TODO - add types
+      case _ =>
     }
   }
 
@@ -283,6 +285,7 @@ trait Serialize extends SerializerUtils {
           prepareForImportSelector(is)
         case tt: TypeTree =>
           prepareForTypeTree(tt)
+        case _ =>
         //          case at: AnnotatedType =>
         //          case stt: SingletonTypeTree =>
         //          case sftt: SelectFromTypeTree =>
@@ -533,26 +536,32 @@ trait Serialize extends SerializerUtils {
 
     def getOrUpdateSymbol(sym: Symbol): Int = symbolOffsets.getOrElseUpdate(sym, addSymbol(sym))
 
+    //all symbols involved in addSymbol
+    //TODO - add currentSyms as a parameter to addSymbol
+    val currentSyms: scala.collection.mutable.HashMap[Symbol, Int] = scala.collection.mutable.HashMap()
     def addSymbol(sym: Symbol): Int = {
       val cur = serializedSymbols.writeIndex
       writeRefHeader(sym)
+      currentSyms.getOrElseUpdate(sym, cur)
       sym match {
         case NoSymbol =>
         case _ if sym.isRoot | sym.isRootSymbol =>
         case _ if sym.hasPackageFlag =>
-          writeSymbolRef(sym.owner, writeToTrees = false)
+          //if sym == sym.owner we should only write symbolId in section
+          //check is required to resolve recursion
+          if (!currentSyms.contains(sym.owner)) writeSymbolRef(sym.owner, writeToTrees = false) else serializedSymbols.writeNat(currentSyms(sym.owner))
           writeStringIdFromRefSection(sym.fullName)
         //Local
         case _ if !sym.isLocatable =>
-          writeSymbolRef(sym.owner, writeToTrees = false)
+          if (!currentSyms.contains(sym.owner)) writeSymbolRef(sym.owner, writeToTrees = false) else serializedSymbols.writeNat(currentSyms(sym.owner))
           //localDefinition (TODO)
         //External Type
         case _ if sym.isType =>
-          writeSymbolRef(sym.owner, writeToTrees = false)
+          if (!currentSyms.contains(sym.owner)) writeSymbolRef(sym.owner, writeToTrees = false) else serializedSymbols.writeNat(currentSyms(sym.owner))
           writeStringIdFromRefSection(sym.fullName)
         //External Term
         case _ if sym.isTerm =>
-          writeSymbolRef(sym.owner, writeToTrees = false)
+          if (!currentSyms.contains(sym.owner)) writeSymbolRef(sym.owner, writeToTrees = false) else serializedSymbols.writeNat(currentSyms(sym.owner))
           writeStringIdFromRefSection(sym.fullName)
           //erasedParamssCount
           serializedSymbols.writeNat(sym.paramss.size)
@@ -561,12 +570,15 @@ trait Serialize extends SerializerUtils {
             serializedSymbols.writeNat(params.size)
             for (param <- params) {
               //erasedParams - TODO-get erased params
-              writeSymbolRef(param.tpe.typeSymbolDirect, writeToTrees = false)
+              val paramToAdd = param.tpe.typeSymbolDirect
+              if (!currentSyms.contains(paramToAdd)) writeSymbolRef(paramToAdd, writeToTrees = false) else serializedSymbols.writeNat(currentSyms(paramToAdd))
             }
           }
           //erasedRet
           //TODO-fix for non-methods
-          writeSymbolRef(sym.tpe.resultType.typeSymbolDirect, writeToTrees = false)
+          val typeToAdd = sym.tpe.resultType.typeSymbolDirect
+          if (!currentSyms.contains(typeToAdd)) writeSymbolRef(typeToAdd, writeToTrees = false) else serializedSymbols.writeNat(currentSyms(typeToAdd))
+          currentSyms.remove(sym)
         //case array => //TODO implement for Array
       }
       cur

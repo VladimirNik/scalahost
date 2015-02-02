@@ -132,47 +132,20 @@ trait Deserialize extends SerializerUtils{
             Constant(res)
           //String
           case 11 =>
-            val value = readString(serializedConstants)
+            //TODO - check
+            val i24 = serializedConstants.readByte()
+            val i16 = serializedConstants.readByte()
+            val i8 = serializedConstants.readByte()
+            val i0 = serializedConstants.readByte()
+            val stringId = ((i24 & 0xFF) << 24) + ((i16 & 0xFF) << 16) + ((i8 & 0xFF) << 8) + ((i0 & 0xFF) << 0)
+            val value = getStringById(stringId)
             //TODO - maybe rewrite
             Constant(value)
         }
-//        c.tag match {
-//          case UnitTag => Array.apply(0.toByte)
-//          case NullTag => Array.apply(1.toByte)
-//          case BooleanTag if c.booleanValue => Array.apply(2.toByte)
-//          case BooleanTag if !c.booleanValue => Array.apply(3.toByte)
-//          case ByteTag => Array.apply(4.toByte, c.byteValue)
-//          case ShortTag =>
-//            val s = c.shortValue
-//            Array.apply(5.toByte, ((s >>> 8) & 0xFF).toByte, (s & 0xFF).toByte)
-//          case CharTag =>
-//            val a = c.charValue
-//            Array.apply(6.toByte, a.toString.getBytes("UTF-8"): _*)
-//          case IntTag =>
-//            val i = c.intValue
-//            Array.apply(7.toByte, ((i >>> 24) & 0xFF).toByte, ((i >>> 16) & 0xFF).toByte, ((i >>> 8) & 0xFF).toByte, (i & 0xFF).toByte)
-//          case LongTag =>
-//            val l = c.longValue
-//            Array.apply(8.toByte,
-//              ((l >>> 56) & 0xFF).toByte, ((l >>> 48) & 0xFF).toByte, ((l >>> 40) & 0xFF).toByte, ((l >>> 32) & 0xFF).toByte,
-//              ((l >>> 24) & 0xFF).toByte, ((l >>> 16) & 0xFF).toByte, ((l >>> 8) & 0xFF).toByte, (l & 0xFF).toByte)
-//          case FloatTag =>
-//            val i = java.lang.Float.floatToIntBits(c.floatValue)
-//            Array.apply(9.toByte, ((i >>> 24) & 0xFF).toByte, ((i >>> 16) & 0xFF).toByte, ((i >>> 8) & 0xFF).toByte, (i & 0xFF).toByte)
-//          case DoubleTag =>
-//            val l = java.lang.Double.doubleToRawLongBits(c.doubleValue)
-//            Array.apply(10.toByte,
-//              ((l >>> 56) & 0xFF).toByte, ((l >>> 48) & 0xFF).toByte, ((l >>> 40) & 0xFF).toByte, ((l >>> 32) & 0xFF).toByte,
-//              ((l >>> 24) & 0xFF).toByte, ((l >>> 16) & 0xFF).toByte, ((l >>> 8) & 0xFF).toByte, (l & 0xFF).toByte)
-//          case StringTag =>
-//            val a = c.stringValue
-//            val i = stringOffsets.getOrElseUpdate(a, addString(a))
-//            Array.apply(11.toByte, ((i >>> 24) & 0xFF).toByte, ((i >>> 16) & 0xFF).toByte, ((i >>> 8) & 0xFF).toByte, (i & 0xFF).toByte)
-//          case ClazzTag =>
-//            ???
-//          case EnumTag =>
-//            ???
       }
+
+      val stringsSectionNameBytes = readString(input)
+      val serializedStrings = readPB(input)
 
       def deserializeConstants: mutable.Map[Int, Constant] = {
         val list = serializedConstants.until(serializedConstants.bytes.size,
@@ -184,11 +157,6 @@ trait Deserialize extends SerializerUtils{
         )
         mutable.Map(list: _*)
       }
-
-      constants ++= (deserializeConstants)
-
-      val stringsSectionNameBytes = readString(input)
-      val serializedStrings = readPB(input)
 
       //TODO - method to deserialize strings section
       def deserializeStrings: mutable.Map[Int, String] = {
@@ -202,7 +170,12 @@ trait Deserialize extends SerializerUtils{
         mutable.Map(list: _*)
       }
 
+      //strings should be initialized before constants
       strings ++= (deserializeStrings)
+      constants ++= (deserializeConstants)
+
+      println(s"constants: $constants")
+      println(s"strings: $strings")
 
       //TODO: trees processing
     }
