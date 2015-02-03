@@ -17,13 +17,11 @@ trait Deserialize extends SerializerUtils{
   import scala.collection.mutable.{ArrayBuffer, ArrayBuilder}
   import scala.runtime.BoxedUnit
 
-  val deserialiazer = new BinaryDeserializer
+  val deserializer = new BinaryDeserializer
 
-  def deserialize(file: File) = deserialiazer.deserialize(file)
+  def deserialize(file: File) = deserializer.deserialize(file)
 
   class BinaryDeserializer {
-
-    val trees = new PickleBuffer(new Array[Byte](1024), 0, 0)
 
     def convertToString(ar: Array[Byte]): String = new String(ar, "UTF-8")
 
@@ -177,7 +175,293 @@ trait Deserialize extends SerializerUtils{
       println(s"constants: $constants")
       println(s"strings: $strings")
 
+      val treesSectionNameBytes = readString(input)
+      val serializedTrees = readPB(input)
+
+      def getStringByIdInTrees(): String = {
+        val stringId = serializedTrees.readNat()
+        getStringById(stringId)
+      }
+
+      def getConstantByIdInTrees(): Constant = {
+        val constantId = serializedTrees.readNat()
+        println(s"constantId: $constantId")
+        getConstantById(constantId)
+      }
+
       //TODO: trees processing
+      def deserializeTrees: Tree = {
+        val treeId = serializedTrees.readByte()
+        println(s"treeId: $treeId")
+
+        def deserializeNumOfTrees(num: Int): List[Tree] = {
+          val res = (0 until num).toList map { x =>
+            deserializeTrees
+          }
+          res
+        }
+
+        def readTreeArgs: List[Tree] = {
+          //read number of trees
+          val num: Int = serializedTrees.readNat()
+          println(s"num: $num")
+
+          //deserialize args
+          deserializeNumOfTrees(num)
+        }
+
+        val tree = (treeId) match {
+          case 0 => EmptyTree
+          //Ident
+          case 1 =>
+            val symId = serializedTrees.readNat()
+            Ident(symId.toString)
+
+          //Select | TypeRef
+          case 2 =>
+            val symId = serializedTrees.readNat()
+            val qual = deserializeTrees
+            Select(qual, symId.toString)
+
+          //This
+          case 3 =>
+            val symId = serializedTrees.readNat()
+            This(newTypeName(symId.toString))
+
+          //Super
+          case 4 =>
+            val symQualId = serializedTrees.readNat()
+            val symOwnerId = serializedTrees.readNat()
+            Super(Ident(symQualId.toString), newTypeName(symOwnerId.toString))
+
+          //Apply
+          case 5 =>
+            val argsCount: Int = serializedTrees.readNat()
+            val fun = deserializeTrees
+            val args = deserializeNumOfTrees(argsCount)
+            Apply(fun, args)
+
+          //UnApply
+          case 6 => ???
+
+          //case 7 => NamedArg
+          //case 8 => SeqLiteral
+
+          //TypeApply
+          case 9 =>
+            val argsCount: Int = serializedTrees.readNat()
+            val fun = deserializeTrees
+            val args = deserializeNumOfTrees(argsCount)
+            TypeApply(fun, args)
+
+          //Literal
+          case 10 =>
+            Literal(getConstantByIdInTrees())
+
+          //New
+          case 11 =>
+            val tree = deserializeTrees
+            New(tree)
+
+          //Typed
+          case 12 =>
+            val expr = deserializeTrees
+            val tpt = deserializeTrees
+            Typed(expr, tpt)
+
+          //Assign
+          case 13 =>
+            val lhs = deserializeTrees
+            val rhs = deserializeTrees
+            Assign(lhs, rhs)
+
+          //Block
+          case 14 =>
+            val stats = readTreeArgs
+            Block(stats: _*)
+
+          //If
+          case 15 =>
+            val ifp = deserializeTrees
+            val thenp = deserializeTrees
+            val elsep = deserializeTrees
+            If(ifp, thenp, elsep)
+
+          //case 16 => Closure
+
+          //Match
+          case 17 => ???
+
+          //CaseDef
+          case 18 => ???
+
+          //Return
+          case 19 => ???
+
+          //Try
+          case 20 => ???
+
+          //Throw
+          case 21 => ???
+
+          //Bind
+          case 22 => ???
+
+          //Alternative
+          case 23 => ???
+
+          //24 is annotation
+
+          //ValDef
+          case 25 =>
+            val name = getStringByIdInTrees()
+            println(s"name-ValDef: $name")
+            val tpt = deserializeTrees
+            val rhs = deserializeTrees
+            ValDef(NoMods, newTermName(name), tpt, rhs)
+
+          //DefDef
+          case 26 =>
+            val name = getStringByIdInTrees()
+            println(s"name: $name")
+            val tparamsCount: Int = serializedTrees.readNat()
+            println(s"tparamsCount: $tparamsCount")
+
+            val vparamssCount: Int = serializedTrees.readNat()
+            println(s"vparamssCount: $vparamssCount")
+
+            val vparamsArray: Array[Int] = new Array(vparamssCount)
+            for (i <- (0 until vparamsArray.size)) {
+              vparamsArray(i) = serializedTrees.readNat()
+            }
+            println(s"vparamsArray.toList: ${vparamsArray.toList}")
+
+            val tparams = deserializeNumOfTrees(tparamsCount) map (tr => tr.asInstanceOf[TypeDef])
+            println(s"tparams: $tparams")
+
+            val vparamss: List[List[ValDef]] =
+              vparamsArray.toList map {
+                vparamsCount =>
+                deserializeNumOfTrees(vparamsCount) map (tr => tr.asInstanceOf[ValDef])
+              }
+            println(s"vparamss: $vparamss")
+
+            val tpt = deserializeTrees
+            println(s"tpt: ${showRaw(tpt)}")
+
+            val rhs = deserializeTrees
+            println(s"rhs: ${showRaw(rhs)}")
+
+            DefDef(NoMods, newTermName(name), tparams,
+              vparamss, tpt, rhs)
+
+          //TypeDef
+          case 27 =>
+            val name = getStringByIdInTrees()
+            val tparamsCount: Int = serializedTrees.readNat()
+            val tparams = deserializeNumOfTrees(tparamsCount) map (tr => tr.asInstanceOf[TypeDef])
+            val rhs: Tree = deserializeTrees
+            TypeDef(NoMods, newTypeName(name), tparams, rhs)
+
+          //ModuleDef
+          case 28 =>
+            val name = getStringByIdInTrees()
+            val impl = deserializeTrees.asInstanceOf[Template]
+            ModuleDef(NoMods, newTermName(name), impl)
+
+          //Template
+          case 29 =>
+            val parentsCount: Int = serializedTrees.readNat()
+            val bodyCount: Int = serializedTrees.readNat()
+            val constr = deserializeTrees
+            println(s"constr: ${showRaw(constr)}")
+            val parents = deserializeNumOfTrees(parentsCount)
+            println(s"parents: ${parents}")
+            val self = deserializeTrees
+            println(s"self: ${self}")
+
+            val selfy = self.asInstanceOf[ValDef]
+            val body = deserializeNumOfTrees(bodyCount)
+            Template(parents, selfy, constr :: body)
+
+//          //Template (working)
+//          case 29 =>
+//            val parentsCount: Int = serializedTrees.readNat()
+//            val bodyCount: Int = serializedTrees.readNat()
+//            val constr = deserializeTrees
+//            println(s"constr: ${showRaw(constr)}")
+//            val parents = deserializeNumOfTrees(parentsCount)
+//            println(s"parents: ${parents}")
+//            val self = deserializeTrees.asInstanceOf[ValDef]
+//            val body = deserializeNumOfTrees(bodyCount)
+//            Template(parents, self, constr :: body)
+
+          //PackageDef
+          case 30 =>
+            val argsSize = serializedTrees.readNat()
+            val ident = deserializeTrees.asInstanceOf[RefTree]
+
+            //writeArgsCount(tree.stats.size) // to be replaced by tree size
+            val args = deserializeNumOfTrees(argsSize)
+            println(s"args: $args")
+            PackageDef(ident, args)
+
+          //Import
+          case 31 => //what to do with ImportSelector - they are not trees for us!
+            val argsCount = serializedTrees.readNat()
+            val expr = deserializeTrees
+            //TODO - fix it
+            Import(expr, List(ImportSelector(newTermName("test"), argsCount, newTermName("test"), argsCount)))
+
+          //case 32 => Pair
+
+          //AnnotatedType
+          case 33 =>
+            //TODO - fix
+            TypeTree(NoType)
+
+          //SingletonType
+          case 34 =>
+            //TODO - fix
+            TypeTree(NoType)
+
+          //SelectFromTypeTree
+          case 35 => ???
+
+          //case 36 => AndType
+          //case 37 => OrType
+
+          //RefinedType
+          case 38 =>
+            //TODO - fix
+            TypeTree(NoType)
+
+          //case 39 => ByNameTypeTree
+          //case 40 => RepeatedType
+
+          //TypeBounds
+          case 41 =>
+            //TODO - fix
+            TypeTree(NoType)
+
+          //case 42 => ExistentialType
+          //case 43 => AppliedType
+
+          //TODO - remove just for test purposes
+          //TypeRef | ThisType
+          case 44 =>
+            //TODO - fix
+            TypeTree(NoType)
+
+          case _ => ???
+        }
+        val r = tree
+        println(s"r: ${showRaw(r)}")
+        r
+      }
+      val res = deserializeTrees
+      println
+      println(s"tree: ${showRaw(res)}")
     }
 
     def init(unit: Tree): Unit = {
@@ -219,66 +503,23 @@ trait Deserialize extends SerializerUtils{
     val constants: mutable.Map[Int, Constant] = new mutable.HashMap[Int, Constant]()
 
     //TODO - method to get constant from constants Map[Offset, Constant]
-    def getCostantById(id: Int): Constant = constants(id)
-
-//    def deserializeTrees(c: Array[Byte]): Constant = {
-//      val id = (nd: @unchecked) match {
-//        case EmptyTree => 0
-//        case _: Ident@unchecked => 1
-//        case _: Select@unchecked | _: TypeRef => 2
-//        case _: This@unchecked => 3
-//        case _: Super@unchecked => 4
-//        case _: Apply@unchecked => 5
-//        case _: UnApply@unchecked => 6
-//        //          case _: NamedArg@unchecked => 7
-//        //          case _: SeqLiteral@unchecked => 8
-//        case _: TypeApply@unchecked => 9
-//        case _: Literal@unchecked => 10
-//        case _: New@unchecked => 11
-//        case _: Typed@unchecked => 12
-//        case _: Assign@unchecked => 13
-//        case _: Block@unchecked => 14
-//        case _: If@unchecked => 15
-//        //          case _: Closure@unchecked => 16
-//        case _: Match@unchecked => 17
-//        case _: CaseDef@unchecked => 18
-//        case _: Return@unchecked => 19
-//        case _: Try@unchecked => 20
-//        case _: Throw@unchecked => 21
-//        case _: Bind@unchecked => 22
-//        case _: Alternative@unchecked => 23
-//        //24 is annotation
-//        case _: ValDef@unchecked => 25
-//        case _: DefDef@unchecked => 26
-//        case _: TypeDef@unchecked => 27
-//        case _: ModuleDef@unchecked => 28
-//        case _: Template@unchecked => 29
-//        case _: PackageDef@unchecked => 30
-//        case _: Import@unchecked => 31
-//        //          case _: Pair@unchecked => 32
-//        case _: AnnotatedType@unchecked => 33
-//        case _: SingletonType@unchecked => 34
-//        case _: SelectFromTypeTree@unchecked => 35
-//        //          case _: AndType@unchecked => 36
-//        //          case _: OrType@unchecked => 37
-//        case _: RefinedType@unchecked => 38
-//        //          case _: ByNameTypeTree@unchecked => 39
-//        //case _: RepeatedType => 40
-//        case _: TypeBounds@unchecked => 41
-//        //case _: ExistentialType => 42
-//        //case _: AppliedType => 43
-//      }
-//      trees.writeByte(id)
-//    }
-
-    //from trees
-    def readBoolean: Int = {
-      ???
+    def getConstantById(id: Int): Constant = {
+      println(s"id: $id")
+      println(s"constants.contains(id): ${constants.contains(id)}")
+      val res = constants.apply(id)
+      println(s"res: $res")
+      res
     }
 
     //from trees
-    def readArgsCount: Int = {
-      ???
+    def readBoolean(pb: PickleBuffer): Boolean = {
+      val value = pb.readByte()
+      if (value > 0) true else false
+    }
+
+    //from trees
+    def readArgsCount(pb: PickleBuffer): Int = {
+      pb.readNat()
     }
   }
 

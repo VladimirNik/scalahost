@@ -48,8 +48,12 @@ trait Serialize extends SerializerUtils {
         annotationLevel += 1
         //annotationTransformer.macroTransform(annot.tree)
         annotationLevel -= 1
-        writeType(tpe)
+        //TODO - uncomment, commented in test purposes
+        //writeType(tpe)
       case t: ThisType =>
+        //TODO - this type shouldn't be here, remove, change to This
+        writeNodeHeader(tp)
+
         annotationLevel += 1
         //annotationTransformer.macroTransform(This(t.cls))
         annotationLevel -= 1
@@ -59,8 +63,9 @@ trait Serialize extends SerializerUtils {
         annotationLevel -= 1
       case t@TypeRef(prefix, sym, name) =>
         writeNodeHeader(tp)
-        writeType(prefix)
-        serializer.writeSymbolRef(t.typeSymbol)
+        //TODO - uncomment, commented in test purposes
+        //writeType(prefix)
+        //serializer.writeSymbolRef(t.typeSymbol)
       //TODO - add types
       case _ =>
     }
@@ -93,6 +98,7 @@ trait Serialize extends SerializerUtils {
   def sizedTree(tree: Tree, args: Int): Unit = {
     writeNodeHeader(tree)
     /* putSizeField(tree) */
+    writeArgsCount(args)
   }
 
   def closeSizedTree(tree: Tree): Tree = {
@@ -100,7 +106,10 @@ trait Serialize extends SerializerUtils {
     tree
   }
 
-  def prepareForApply(tree: Apply): Unit = sizedTree(tree, tree.args.size)
+  def prepareForApply(tree: Apply): Unit = {
+    sizedTree(tree, tree.args.size)
+//    writeArgsCount(tree.args.size)
+  }
 
   def prepareForTypeApply(tree: TypeApply): Unit = sizedTree(tree, tree.args.size)
 
@@ -115,7 +124,8 @@ trait Serialize extends SerializerUtils {
 
   def prepareForAssign(tree: Assign): Unit = noActualFields(tree, writeSize = true)
 
-  def prepareForBlock(tree: Block): Unit = sizedTree(tree, tree.stats.size + 1)
+  def prepareForBlock(tree: Block): Unit = sizedTree(tree, tree.stats.size)
+  //def prepareForBlock(tree: Block): Unit = sizedTree(tree, tree.stats.size + 1)
 
   def prepareForIf(tree: If): Unit = noActualFields(tree, writeSize = true)
 
@@ -188,7 +198,8 @@ trait Serialize extends SerializerUtils {
 
   def prepareForPackageDef(tree: PackageDef): Unit = {
     writeNodeHeader(tree)
-    writeString(tree.pid.symbol.fullName)
+    //TODO - I think that we shouldn't persist the name here
+    //writeString(tree.pid.symbol.fullName)
     writeArgsCount(tree.stats.size) // to be replaced by tree size
   }
 
@@ -696,7 +707,7 @@ trait Serialize extends SerializerUtils {
       val id = (nd: @unchecked) match {
         case EmptyTree => 0
         case _: Ident@unchecked => 1
-        case _: Select@unchecked | _: TypeRef => 2
+        case _: Select@unchecked => 2 // TODO - uncomment later | _: TypeRef => 2
         case _: This@unchecked => 3
         case _: Super@unchecked => 4
         case _: Apply@unchecked => 5
@@ -726,7 +737,7 @@ trait Serialize extends SerializerUtils {
         case _: Template@unchecked => 29
         case _: PackageDef@unchecked => 30
         case _: Import@unchecked => 31
-        //          case _: Pair@unchecked => 32
+        //      case _: Pair@unchecked => 32
         case _: AnnotatedType@unchecked => 33
         case _: SingletonType@unchecked => 34
         case _: SelectFromTypeTree@unchecked => 35
@@ -738,6 +749,8 @@ trait Serialize extends SerializerUtils {
         case _: TypeBounds@unchecked => 41
         //case _: ExistentialType => 42
         //case _: AppliedType => 43
+          //TODO - remove TypeRef - just for test purposes
+        case _: TypeRef@unchecked => 44
       }
       trees.writeByte(id)
     }
