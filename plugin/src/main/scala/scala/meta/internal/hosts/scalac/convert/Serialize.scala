@@ -124,8 +124,10 @@ trait Serialize extends SerializerUtils {
 
   def prepareForAssign(tree: Assign): Unit = noActualFields(tree, writeSize = true)
 
-  def prepareForBlock(tree: Block): Unit = sizedTree(tree, tree.stats.size)
-  //def prepareForBlock(tree: Block): Unit = sizedTree(tree, tree.stats.size + 1)
+  def prepareForBlock(tree: Block): Unit = {
+    sizedTree(tree, tree.stats.size + 1)
+  }
+//  def prepareForBlock(tree: Block): Unit = sizedTree(tree, tree.stats.size + 1)
 
   def prepareForIf(tree: If): Unit = noActualFields(tree, writeSize = true)
 
@@ -304,7 +306,11 @@ trait Serialize extends SerializerUtils {
         //          case ett: ExistentialTypeTree =>
         //          case att: AppliedTypeTree =>
       }
-      super.traverse(tree)
+
+      tree match {
+        case _: Super =>
+        case _ => super.traverse(tree)
+      }
     }
   }
 

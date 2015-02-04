@@ -373,16 +373,22 @@ trait Deserialize extends SerializerUtils{
           case 29 =>
             val parentsCount: Int = serializedTrees.readNat()
             val bodyCount: Int = serializedTrees.readNat()
-            val constr = deserializeTrees
-            println(s"constr: ${showRaw(constr)}")
-            val parents = deserializeNumOfTrees(parentsCount)
-            println(s"parents: ${parents}")
-            val self = deserializeTrees
-            println(s"self: ${self}")
 
-            val selfy = self.asInstanceOf[ValDef]
-            val body = deserializeNumOfTrees(bodyCount)
-            Template(parents, selfy, constr :: body)
+            val parents = deserializeNumOfTrees(parentsCount)
+            println(s"=====> parents: ${parents}")
+
+            //TODO - fix - noSelfType is not persisted
+            //val self = deserializeTrees
+            //println(s"=====> self: ${self}")
+            //val selfy = self.asInstanceOf[ValDef]
+
+            val constr = deserializeTrees
+            println(s"=====> constr: ${constr}")
+
+            val body = deserializeNumOfTrees(bodyCount-1) //constr is already deserialized
+            println(s"=====> body: ${body}")
+
+            Template(parents, noSelfType, constr :: body)
 
 //          //Template (working)
 //          case 29 =>
@@ -462,6 +468,8 @@ trait Deserialize extends SerializerUtils{
       val res = deserializeTrees
       println
       println(s"tree: ${showRaw(res)}")
+      println
+      println(s"tree: ${res}")
     }
 
     def init(unit: Tree): Unit = {
