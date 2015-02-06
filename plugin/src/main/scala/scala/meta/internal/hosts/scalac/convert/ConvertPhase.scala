@@ -34,6 +34,46 @@ trait ConvertPhase {
         val punit = c.toScalameta(unit.body, classOf[Source])
         unit.body.appendMetadata("scalameta" -> punit)
 
+        val tree = unit.body
+        val rootMirror = global.rootMirror
+        val RootClass = rootMirror.RootClass
+
+
+        val traverser = new Traverser {
+          override def traverse(tree: Tree) = {
+            val sym = tree.symbol
+            println()
+            println(s"tree: $tree")
+            println(s"sym: $sym")
+            println(s"showRaw(sym): ${showRaw(sym)}")
+            println("---")
+            if (sym != null && sym != NoSymbol) {
+//              RootClass.ge
+//              println(s"res: $res")
+//              println(s"sym.ownerChain: ${sym.ownerChain}")
+              println(s"sym.info: ${if (sym.info.toString().size > 100) sym.info.toString.substring(0, 100) else sym.info}")
+              println(s"showRaw(sym.info): ${if (showRaw(sym.info).toString().size > 100) showRaw(sym.info).toString.substring(0, 100) else showRaw(sym.info)}")
+              println(s"sym.tpe: ${sym.tpe}")
+              println(s"showRaw(sym.tpe): ${showRaw(sym.tpe)}")
+              println("---")
+            }
+            if (tree.tpe != null  && tree.tpe != NoType) {
+              println(s"tree.tpe: ${tree.tpe}")
+              println(s"showRaw(tree.tpe): ${showRaw(tree.tpe)}")
+//              if (sym != null)
+//                println(s"sym.info =:= tree.tpe: ${sym.info =:= tree.tpe}")
+            }
+
+            println()
+            super.traverse(tree)
+          }
+        }
+
+        val res = rootMirror.getModuleIfDefined("Main")
+        println(s"res: $res")
+
+        traverser.traverse(tree)
+
         val serializer = new {
           val global: convSelf.global.type = convSelf.global
         } with Serialize

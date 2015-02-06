@@ -38,8 +38,8 @@ trait Deserialize extends SerializerUtils{
       val magic: Int = input.readRawInt
       val version: Int = input.readRawInt
 
-      println(s"Magic: $magic, should be: ${0x000A11CE}")
-      println(s"version: $version, should be: 0")
+//      println(s"Magic: $magic, should be: ${0x000A11CE}")
+//      println(s"version: $version, should be: 0")
 
       def readAE(pb: PickleBuffer): Array[Byte] = {
         val size = pb.readRawInt
@@ -172,8 +172,8 @@ trait Deserialize extends SerializerUtils{
       strings ++= (deserializeStrings)
       constants ++= (deserializeConstants)
 
-      println(s"constants: $constants")
-      println(s"strings: $strings")
+//      println(s"constants: $constants")
+//      println(s"strings: $strings")
 
       val treesSectionNameBytes = readString(input)
       val serializedTrees = readPB(input)
@@ -185,14 +185,14 @@ trait Deserialize extends SerializerUtils{
 
       def getConstantByIdInTrees(): Constant = {
         val constantId = serializedTrees.readNat()
-        println(s"constantId: $constantId")
+//        println(s"constantId: $constantId")
         getConstantById(constantId)
       }
 
       //TODO: trees processing
       def deserializeTrees: Tree = {
         val treeId = serializedTrees.readByte()
-        println(s"treeId: $treeId")
+//        println(s"treeId: $treeId")
 
         def deserializeNumOfTrees(num: Int): List[Tree] = {
           val res = (0 until num).toList map { x =>
@@ -204,7 +204,7 @@ trait Deserialize extends SerializerUtils{
         def readTreeArgs: List[Tree] = {
           //read number of trees
           val num: Int = serializedTrees.readNat()
-          println(s"num: $num")
+//          println(s"num: $num")
 
           //deserialize args
           deserializeNumOfTrees(num)
@@ -315,7 +315,7 @@ trait Deserialize extends SerializerUtils{
           //ValDef
           case 25 =>
             val name = getStringByIdInTrees()
-            println(s"name-ValDef: $name")
+//            println(s"name-ValDef: $name")
             val tpt = deserializeTrees
             val rhs = deserializeTrees
             ValDef(NoMods, newTermName(name), tpt, rhs)
@@ -323,34 +323,34 @@ trait Deserialize extends SerializerUtils{
           //DefDef
           case 26 =>
             val name = getStringByIdInTrees()
-            println(s"name: $name")
+//            println(s"name: $name")
             val tparamsCount: Int = serializedTrees.readNat()
-            println(s"tparamsCount: $tparamsCount")
+//            println(s"tparamsCount: $tparamsCount")
 
             val vparamssCount: Int = serializedTrees.readNat()
-            println(s"vparamssCount: $vparamssCount")
+//            println(s"vparamssCount: $vparamssCount")
 
             val vparamsArray: Array[Int] = new Array(vparamssCount)
             for (i <- (0 until vparamsArray.size)) {
               vparamsArray(i) = serializedTrees.readNat()
             }
-            println(s"vparamsArray.toList: ${vparamsArray.toList}")
+//            println(s"vparamsArray.toList: ${vparamsArray.toList}")
 
             val tparams = deserializeNumOfTrees(tparamsCount) map (tr => tr.asInstanceOf[TypeDef])
-            println(s"tparams: $tparams")
+//            println(s"tparams: $tparams")
 
             val vparamss: List[List[ValDef]] =
               vparamsArray.toList map {
                 vparamsCount =>
                 deserializeNumOfTrees(vparamsCount) map (tr => tr.asInstanceOf[ValDef])
               }
-            println(s"vparamss: $vparamss")
+//            println(s"vparamss: $vparamss")
 
             val tpt = deserializeTrees
-            println(s"tpt: ${showRaw(tpt)}")
+//            println(s"tpt: ${showRaw(tpt)}")
 
             val rhs = deserializeTrees
-            println(s"rhs: ${showRaw(rhs)}")
+//            println(s"rhs: ${showRaw(rhs)}")
 
             DefDef(NoMods, newTermName(name), tparams,
               vparamss, tpt, rhs)
@@ -375,7 +375,7 @@ trait Deserialize extends SerializerUtils{
             val bodyCount: Int = serializedTrees.readNat()
 
             val parents = deserializeNumOfTrees(parentsCount)
-            println(s"=====> parents: ${parents}")
+//            println(s"=====> parents: ${parents}")
 
             //TODO - fix - noSelfType is not persisted
             //val self = deserializeTrees
@@ -383,10 +383,10 @@ trait Deserialize extends SerializerUtils{
             //val selfy = self.asInstanceOf[ValDef]
 
             val constr = deserializeTrees
-            println(s"=====> constr: ${constr}")
+//            println(s"=====> constr: ${constr}")
 
             val body = deserializeNumOfTrees(bodyCount-1) //constr is already deserialized
-            println(s"=====> body: ${body}")
+//            println(s"=====> body: ${body}")
 
             Template(parents, noSelfType, constr :: body)
 
@@ -409,7 +409,7 @@ trait Deserialize extends SerializerUtils{
 
             //writeArgsCount(tree.stats.size) // to be replaced by tree size
             val args = deserializeNumOfTrees(argsSize)
-            println(s"args: $args")
+//            println(s"args: $args")
             PackageDef(ident, args)
 
           //Import
@@ -462,14 +462,14 @@ trait Deserialize extends SerializerUtils{
           case _ => ???
         }
         val r = tree
-        println(s"r: ${showRaw(r)}")
+//        println(s"r: ${showRaw(r)}")
         r
       }
       val res = deserializeTrees
-      println
-      println(s"tree: ${showRaw(res)}")
-      println
-      println(s"tree: ${res}")
+//      println
+//      println(s"tree: ${showRaw(res)}")
+//      println
+//      println(s"tree: ${res}")
     }
 
     def init(unit: Tree): Unit = {
@@ -512,10 +512,10 @@ trait Deserialize extends SerializerUtils{
 
     //TODO - method to get constant from constants Map[Offset, Constant]
     def getConstantById(id: Int): Constant = {
-      println(s"id: $id")
-      println(s"constants.contains(id): ${constants.contains(id)}")
+//      println(s"id: $id")
+//      println(s"constants.contains(id): ${constants.contains(id)}")
       val res = constants.apply(id)
-      println(s"res: $res")
+//      println(s"res: $res")
       res
     }
 
