@@ -467,46 +467,70 @@ trait Deserialize extends SerializerUtils with TastyConstants with RefReps {
       }
       val res = deserializeTrees
 
+      println(s"tree: ${res}")
+      println
+      println
+      println(s"strings $strings")
+      println
+
       val symbolsSectionNameBytes = readString(input)
       val serializedSymbols = readPB(input)
 
       def readRef: RefRep = {
         val refId = serializedSymbols.readByte()
-        refId match {
-          case NoSymbolVal => NoSymbolRep()
-          case RootSymbolVal => RootSymbolRep()
+        println("---------------")
+        println(s"refId: $refId")
+        val r = refId match {
+          case NoSymbolVal =>
+            println(s"NoSymbolVal")
+            NoSymbolRep()
+          case RootSymbolVal =>
+            println(s"RootSymbolVal")
+            RootSymbolRep()
           case LocalPackageSymbolVal =>
+            println(s"LocalPackageSymbolVal")
             val ownerId = serializedSymbols.readNat()
-            val name = readString(serializedSymbols)
+            println(s"  ownerId: $ownerId")
+            val stringId = serializedSymbols.readNat()
+            println(s"  stringId: $stringId")
+            val name = getStringById(stringId)
             LocalPackageSymbolRep(ownerId, name)
           //Local
           case LocalSymbolVal =>
+            println(s"LocalSymbolVal")
             val ownerId = serializedSymbols.readNat()
             val treeId = serializedSymbols.readNat()
             LocalSymbolRep(ownerId, treeId)
           //External Type
           case TypeSymbolVal =>
+            println(s"TypeSymbolVal")
             val ownerId = serializedSymbols.readNat()
-            val name = readString(serializedSymbols)
+            val stringId = serializedSymbols.readNat()
+            val name = getStringById(stringId)
             TypeSymbolRep(ownerId, name)
           //External Term
           case TermSymbolVal =>
+            println(s"TermSymbolVal")
             val ownerId = serializedSymbols.readNat()
-            val name = readString(serializedSymbols)
+            val stringId = serializedSymbols.readNat()
+            val name = getStringById(stringId)
             val paramssSize = serializedSymbols.readNat()
 
-            val paramRefIds: List[List[Int]] = for (paramsSizeIndex <- paramssSize) {
+            val paramRefIds: List[List[Int]] = 0 until paramssSize map { paramsSizeIndex =>
               val paramsSize = serializedSymbols.readNat()
-              for (paramId <- paramsSize) {
+              0 until paramsSize map { paramId =>
                 val param = serializedSymbols.readNat()
-              }
-            }
+                param
+              } toList
+            } toList
 
             val erasedRetId = serializedSymbols.readNat()
             val tsr = TermSymbolRep(ownerId, name, paramssSize, erasedRetId)
             tsr.erasedParams = paramRefIds
             tsr
         }
+        println(s"r: $r")
+        r
       }
 
       def deserializeSymbols: mutable.Map[Int, RefRep] = {
@@ -523,11 +547,11 @@ trait Deserialize extends SerializerUtils with TastyConstants with RefReps {
       val refs = deserializeSymbols
 
       println("====================")
+
       println(s"refs: $refs")
 //      println
 //      println(s"tree: ${showRaw(res)}")
-//      println
-//      println(s"tree: ${res}")
+
     }
 
     def init(unit: Tree): Unit = {

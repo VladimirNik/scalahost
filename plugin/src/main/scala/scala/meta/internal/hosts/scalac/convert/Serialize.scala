@@ -1,7 +1,6 @@
 package scala.meta.internal.hosts.scalac.convert
 
 import java.io.{File, FileOutputStream, BufferedOutputStream, BufferedWriter}
-import com.sun.deploy.util.OrderedHashSet
 
 import scala.tools.nsc.Global
 
@@ -545,7 +544,7 @@ trait Serialize extends SerializerUtils with TastyConstants {
 
     val serializedSymbols = new PickleBuffer(new Array[Byte](1024), 0, 0)
     val symbolOffsets = new mutable.HashMap[Symbol, Int]()
-    val localSymbols = scala.collection.mutable.SortedSet[Symbol]()
+    val localSymbols = scala.collection.mutable.LinkedHashSet[Symbol]()
     val treeOffsetsForDefs = mutable.HashMap[Symbol, Int]()
 
     def isLocalSymbol(sym: Symbol): Boolean =
@@ -598,24 +597,73 @@ trait Serialize extends SerializerUtils with TastyConstants {
       currentSyms.getOrElseUpdate(sym, cur)
       id match {
         case NoSymbolVal =>
+          println("------------")
+          println(s"sym: ${sym}")
+          println(s"sym.owner: ${sym.owner}")
+          println(s"currentSyms: $currentSyms")
+          println(s"symbolOffsets.keySet: ${symbolOffsets.keySet}")
         case RootSymbolVal =>
+          println("------------")
+          println(s"sym: ${sym}")
+          println(s"sym.owner: ${sym.owner}")
+          println(s"currentSyms: $currentSyms")
+          println(s"symbolOffsets.keySet: ${symbolOffsets.keySet}")
         //TODO - here we should process only packages from current compilation unit
         case LocalPackageSymbolVal =>
+          println("------------")
+          println(s"sym: ${sym}")
+          println(s"sym.owner: ${sym.owner}")
+          println(s"currentSyms: $currentSyms")
+          println(s"symbolOffsets.keySet: ${symbolOffsets.keySet}")
+          println(s"symbolOffsets.keySet.contains(sym): ${symbolOffsets.keySet.contains(sym)}")
+          val test = symbolOffsets.keySet filter (sym1 => sym1.isPackage && sym1.toString().contains("empty"))
+          println(s"test: ${test}")
+          println(s"sym.owner == test: ${sym.owner == test}")
           //if sym == sym.owner we should only write symbolId in section
           //check is required to resolve recursion
           if (!currentSyms.contains(sym.owner)) writeSymbolRef(sym.owner, writeToTrees = false, writeToSymbols = true) else serializedSymbols.writeNat(currentSyms(sym.owner))
+          //TODO - fix: I don't think that sym.fullName is required here
           writeStringIdFromRefSection(sym.fullName)
         //Local
         case LocalSymbolVal =>
+          println("------------")
+          println(s"sym: ${sym}")
+          println(s"sym.owner: ${sym.owner}")
+          println(s"currentSyms: $currentSyms")
+          println(s"symbolOffsets.keySet: ${symbolOffsets.keySet}")
+          println(s"symbolOffsets.keySet.contains(sym.owner): ${symbolOffsets.keySet.contains(sym)}")
+          val test = symbolOffsets.keySet find (sym1 => sym1.isPackage && sym1.toString().contains("empty"))
+          println(s"test: ${test.getOrElse(null)}")
+          if (test != null) {
+            println(s"sym.owner == test: ${sym.owner == test.getOrElse(null)}")
+            println(s"sym.owner.companionClass: ${sym.owner.companionClass}")
+            println(s"test.getOrElse(NoSymbol).asInstanceOf[Symbol].companionClass: ${test.getOrElse(NoSymbol).asInstanceOf[Symbol].companionClass}")
+            println(s"sym.owner.companionClass == test.companionClass: ${sym.owner.companionClass == test.getOrElse(NoSymbol).asInstanceOf[Symbol].companionClass}")
+          }
           if (!currentSyms.contains(sym.owner)) writeSymbolRef(sym.owner, writeToTrees = false, writeToSymbols = true) else serializedSymbols.writeNat(currentSyms(sym.owner))
           //localDefinition - 777 is a temporary value of def tree reference - should be updated during tree traversal
           serializedSymbols.writeNat(treeOffsetsForDefs.getOrElse(sym, 777))
         //External Type
         case TypeSymbolVal =>
+          println("------------")
+          println(s"sym: ${sym}")
+          println(s"sym.owner: ${sym.owner}")
+          println(s"currentSyms: $currentSyms")
+          println(s"symbolOffsets.keySet: ${symbolOffsets.keySet}")
+
           if (!currentSyms.contains(sym.owner)) writeSymbolRef(sym.owner, writeToTrees = false, writeToSymbols = true) else serializedSymbols.writeNat(currentSyms(sym.owner))
           writeStringIdFromRefSection(sym.fullName)
         //External Term
         case TermSymbolVal =>
+          println("------------")
+          println(s"sym: ${sym}")
+          println(s"sym.owner: ${sym.owner}")
+          println(s"currentSyms: $currentSyms")
+          println(s"symbolOffsets.keySet: ${symbolOffsets.keySet}")
+          println(s"symbolOffsets.keySet.contains(sym): ${symbolOffsets.keySet.contains(sym)}")
+          val test = symbolOffsets.keySet filter (sym1 => sym1.isPackage && sym1.toString().contains("empty"))
+          println(s"test: ${test}")
+          println(s"sym.owner == test: ${sym.owner == test}")
           if (!currentSyms.contains(sym.owner)) writeSymbolRef(sym.owner, writeToTrees = false, writeToSymbols = true) else serializedSymbols.writeNat(currentSyms(sym.owner))
           writeStringIdFromRefSection(sym.fullName)
           //erasedParamssCount

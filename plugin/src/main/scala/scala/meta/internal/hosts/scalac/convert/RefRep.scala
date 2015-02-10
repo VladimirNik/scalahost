@@ -12,7 +12,7 @@ trait RefReps {
   import global._
 
   trait RefRep {
-    var sym: Symbol
+    var sym: Symbol = null
     val ownerId: Int
 
     def isInitialized = sym ne null
@@ -22,42 +22,32 @@ trait RefReps {
   }
 
   case class NoSymbolRep() extends RefRep {
-    var sym: NoSymbol.type = null
-
     val ownerId = -1
 
     override def toString = "NoSymbolRep"
   }
 
   case class RootSymbolRep() extends RefRep {
-    var sym: RootSymbol = null
-
     val ownerId = -1
 
     override def toString = "RootSymbolRep"
   }
 
   case class LocalPackageSymbolRep(ownerId: Int, name: String) extends RefRep {
-    var sym: Symbol = null
-
     override def toString = s"LocalPackageSymbolRep[name: $name, ownerId: $ownerId]"
   }
 
   case class LocalSymbolRep(ownerId: Int, treeId: Int) extends RefRep {
-    var sym: Symbol = null
-
     override def toString = s"LocalSymbolRep[treeId: $treeId, ownerId: $ownerId]"
   }
 
   case class TypeSymbolRep(ownerId: Int, nameStr: String) extends RefRep {
-    var sym: TypeSymbol = null
     val name: TypeName = newTypeName(nameStr)
 
     override def toString = s"TypeSymbolRep[nameStr: $nameStr, ownerId: $ownerId]"
   }
 
   case class TermSymbolRep(ownerId: Int, nameStr: String, erasedParamssCount: Int, erasedRet: Int) extends RefRep {
-    var sym: TermSymbol = null
     var erasedParams: List[List[Int]] = Nil
     val name: TermName = newTermName(nameStr)
 
@@ -65,8 +55,6 @@ trait RefReps {
   }
 
   case class ArraySymbolRep(ownerId: Int) extends RefRep {
-    var sym = null
-
     override def toString = s"ArraySymbolRep[ownerId: $ownerId]"
   }
 
