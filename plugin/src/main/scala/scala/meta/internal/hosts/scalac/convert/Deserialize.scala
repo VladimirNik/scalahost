@@ -3,7 +3,7 @@ package scala.meta.internal.hosts.scalac.convert
 import java.io.{File, FileOutputStream, BufferedOutputStream, BufferedWriter}
 import scala.tools.nsc.Global
 
-trait Deserialize extends SerializerUtils{
+trait Deserialize extends SerializerUtils with TastyConstants with RefReps {
 
   val global: Global
 
@@ -466,6 +466,64 @@ trait Deserialize extends SerializerUtils{
         r
       }
       val res = deserializeTrees
+
+      val symbolsSectionNameBytes = readString(input)
+      val serializedSymbols = readPB(input)
+
+      def readRef: RefRep = {
+        val refId = serializedSymbols.readByte()
+        refId match {
+          case NoSymbolVal => NoSymbolRep()
+          case RootSymbolVal => RootSymbolRep()
+          case LocalPackageSymbolVal =>
+            val ownerId = serializedSymbols.readNat()
+            val name = readString(serializedSymbols)
+            LocalPackageSymbolRep(ownerId, name)
+          //Local
+          case LocalSymbolVal =>
+            val ownerId = serializedSymbols.readNat()
+            val treeId = serializedSymbols.readNat()
+            LocalSymbolRep(ownerId, treeId)
+          //External Type
+          case TypeSymbolVal =>
+            val ownerId = serializedSymbols.readNat()
+            val name = readString(serializedSymbols)
+            TypeSymbolRep(ownerId, name)
+          //External Term
+          case TermSymbolVal =>
+            val ownerId = serializedSymbols.readNat()
+            val name = readString(serializedSymbols)
+            val paramssSize = serializedSymbols.readNat()
+
+            val paramRefIds: List[List[Int]] = for (paramsSizeIndex <- paramssSize) {
+              val paramsSize = serializedSymbols.readNat()
+              for (paramId <- paramsSize) {
+                val param = serializedSymbols.readNat()
+              }
+            }
+
+            val erasedRetId = serializedSymbols.readNat()
+            val tsr = TermSymbolRep(ownerId, name, paramssSize, erasedRetId)
+            tsr.erasedParams = paramRefIds
+            tsr
+        }
+      }
+
+      def deserializeSymbols: mutable.Map[Int, RefRep] = {
+        val list = serializedSymbols.until(serializedSymbols.bytes.size,
+          () => {
+            val ind = serializedSymbols.readIndex
+            val ref = readRef
+            (ind, ref)
+          }
+        )
+        mutable.Map(list: _*)
+      }
+
+      val refs = deserializeSymbols
+
+      println("====================")
+      println(s"refs: $refs")
 //      println
 //      println(s"tree: ${showRaw(res)}")
 //      println
