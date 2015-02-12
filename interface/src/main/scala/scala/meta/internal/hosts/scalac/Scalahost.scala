@@ -37,6 +37,7 @@ class SemanticContext[G <: ScalaGlobal](val g: G) extends ScalametaSemanticConte
   import scala.reflect.internal.Flags._
   implicit val c: ScalametaSemanticContext = this
   def dialect: scala.meta.dialects.Scala211.type = scala.meta.dialects.Scala211
+  def desugar(term: scala.meta.Term) = ???
 
   private[meta] def tpe(term: papi.Term): papi.Type = {
     val tree = term.require[p.Term]
@@ -1446,6 +1447,7 @@ class SemanticContext[G <: ScalaGlobal](val g: G) extends ScalametaSemanticConte
 
 class MacroContext[G <: ScalaGlobal](val scalareflectMacroContext: ScalareflectMacroContext)
 extends ScalahostSemanticContext[G](scalareflectMacroContext.universe.asInstanceOf[G]) with ScalametaMacroContext {
+  override def desugar(term: scala.meta.Term) = ???
   private[meta] def warning(msg: String): Unit = ???
   private[meta] def error(msg: String): Unit = ???
   private[meta] def abort(msg: String): Nothing = ???
@@ -1453,6 +1455,7 @@ extends ScalahostSemanticContext[G](scalareflectMacroContext.universe.asInstance
 }
 
 class ToolboxContext(tb: ToolBox[ru.type]) extends ScalahostSemanticContext(tb.global) {
+  override def desugar(term: scala.meta.Term) = ???
   def define(rutree: ru.ImplDef): p.Tree = {
     val gtree = g.mkImporter(ru).importTree(rutree).asInstanceOf[g.ImplDef]
     val gtypedtree = {
