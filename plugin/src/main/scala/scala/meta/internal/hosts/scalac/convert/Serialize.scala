@@ -664,6 +664,10 @@ trait Serialize extends SerializerUtils with TastyConstants {
           val test = symbolOffsets.keySet filter (sym1 => sym1.isPackage && sym1.toString().contains("empty"))
           println(s"test: ${test}")
           println(s"sym.owner == test: ${sym.owner == test}")
+          println("((")
+          println(s"showRaw(sym.owner): ${showRaw(sym.owner)}")
+          println(s"showRaw(test): ${showRaw(test)}")
+          println("))")
           if (!currentSyms.contains(sym.owner)) writeSymbolRef(sym.owner, writeToTrees = false, writeToSymbols = true) else serializedSymbols.writeNat(currentSyms(sym.owner))
           writeStringIdFromRefSection(sym.fullName)
           //erasedParamssCount
