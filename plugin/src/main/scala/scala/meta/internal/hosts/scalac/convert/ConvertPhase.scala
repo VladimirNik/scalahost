@@ -27,12 +27,12 @@ trait ConvertPhase {
     override val runsRightAfter = None
     val phaseName = "convert"
     override def description = "convert compiler trees to scala.meta"
-    implicit val c = Scalahost.mkSemanticContext[global.type](global)
+//    implicit val c = Scalahost.mkSemanticContext[global.type](global)
 
     override def newPhase(prev: Phase): StdPhase = new StdPhase(prev) {
       override def apply(unit: CompilationUnit) {
-        val punit = c.toScalameta(unit.body, classOf[Source])
-        unit.body.appendMetadata("scalameta" -> punit)
+//        val punit = c.toScalameta(unit.body, classOf[Source])
+//        unit.body.appendMetadata("scalameta" -> punit)
 
         val tree = unit.body
         val rootMirror = global.rootMirror
